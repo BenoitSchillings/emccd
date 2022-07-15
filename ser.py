@@ -29,10 +29,8 @@ class SerWriter(object):
         value.tofile(self._fid)
         
 
-    def swap16(x):
-        return uint16.from_bytes(x.to_bytes(2, byteorder='little'), byteorder='big', signed=False)
 
-    def count():
+    def count(self):
         return self.count
 
     def add_image(self, img):
