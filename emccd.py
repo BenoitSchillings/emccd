@@ -9,10 +9,14 @@ from pyqtgraph.Qt import QtGui, QtCore, QT_LIB
 from PyQt5 import QtWidgets
 from PyQt5.QtGui  import *
 import os
-import skyx
+#import skyx
 import datetime
-from coo import *
 import random
+
+
+from pyvcam import pvc
+from pyvcam.camera import Camera
+from pyvcam import constants as const
 
 
 #--------------------------------------------------------
@@ -22,26 +26,42 @@ app = QtWidgets.QApplication([])
 import argparse
 #--------------------------------------------------------
 
-def bin(a):
-    return(a[0:None:2, 0:None:2] + a[1:None:2, 0:None:2] + a[0:None:2, 1:None:2] + a[1:None:2, 1:None:2])
+class emccd:
+    def __init__(self, temp):
+        
+        print("init cam")
+        pvc.init_pvcam()
+
+        
+        self.vcam = next(Camera.detect_camera())
+        self.vcam.open()
+        self.vcam.gain=2
+        print(self.vcam.temp)
+        self.vcam.temp_setpoint = temp * 100 
+        print(self.vcam.temp_setpoint)
+        self.vcam.clear_mode="Pre-Sequence"
+        #self.vcam.clear_mode="Pre-Exposure"
+
+        pvc.set_param(self.vcam.handle, const.PARAM_READOUT_PORT, 0)
+        #v = pvc.get_param(self.vcam.handle, const.PARAM_FAN_SPEED_SETPOINT, const.ATTR_CURRENT) 
+        pvc.set_param(self.vcam.handle, const.PARAM_GAIN_MULT_FACTOR, 0)
+        
+        while(1):
+            print(self.vcam.temp)
+        
+
+    def get_frame(self):        
+        frame = self.vcam.get_live_frame().reshape(self.vcam.sensor_size[::-1]) 
+        return frame
+        
+    def start(self, exposure):
+        self.vcam.start_live(exp_time=int(exposure*1000.0))
+        
+    def close(self):
+        self.vcam.close()
+
 
 #--------------------------------------------------------
-
-def crop_center(img,crop):
-    y,x = img.shape
-    startx = x//2 - crop//2
-    starty = y//2 - crop//2    
-    return img[starty:starty+crop, startx:startx+crop]
-
-#--------------------------------------------------------
-
-
-
-
-
-  
-
-
 
 class UI:
     def click(self, event):
