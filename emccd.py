@@ -9,8 +9,10 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore, QT_LIB
 from PyQt5 import QtWidgets
 from PyQt5.QtGui  import *
+from PyQt5.QtCore import *
 import os
 #import skyx
+from util import *
 import datetime
 import random
 from ser import SerWriter
@@ -33,7 +35,7 @@ class fake_emccd:
         
         print("init cam")
         self.frame = np.random.randint(0,4096, (512,512), dtype=np.uint16)
-        self.stars_frame = self.stars(self.frame, 20, gain=1)
+        self.stars_frame = self.stars(self.frame, 40, gain=2)
 
     def stars(self, image, number, max_counts=10000, gain=1):
         """
@@ -65,7 +67,7 @@ class fake_emccd:
         return star_im         
 
     def get_frame(self):        
-        self.frame = np.random.randint(0,4096, (512,512), dtype=np.uint16)
+        self.frame = np.random.randint(0,1024, (512,512), dtype=np.uint16)
         
 
         return self.frame + self.stars_frame.astype(np.uint16)
@@ -134,13 +136,24 @@ class UI:
         self.pos = event.pos()
         print (int(self.pos.x()),int(self.pos.y()))
 
+    def convert_nparray_to_QPixmap(self,img):
+        w,h = img.shape
+
+        qimg = QImage(img.data, h, w, QImage.Format_Grayscale16) 
+        qpixmap = QPixmap(qimg)
+
+        return qpixmap
+
+
 
     def __init__(self,  args):
         self.capture_state = 0
         self.update_state = 1
+        self.pos = QPoint(256,256)
         self.array = np.random.randint(0,8192, (512,512), dtype=np.uint16)
-
+        
         self.win = FrameWindow()
+        self.EDGE = 16
         
         self.win.resize(800,800)
         
@@ -154,22 +167,35 @@ class UI:
 
 
         temp_widget = QtWidgets.QWidget(self.win)
-        temp_widget.setLayout(QtWidgets.QVBoxLayout())
-        temp_widget.layout().addWidget(QtWidgets.QPushButton("ok"))
-        temp_widget.layout().addWidget(QtWidgets.QPushButton("cancel"))
+        temp_widget.setLayout(QtWidgets.QHBoxLayout())
+        temp_widget.setFixedSize(768, 256)
+        self.zoom_view = QtWidgets.QLabel(self.win)
+        
+        temp_widget.layout().addWidget(self.zoom_view)
+        
         self.statusBar.addPermanentWidget(temp_widget, 1)
 
 
-
-
+        rightlayout = QtWidgets.QWidget(self.win)
+        rightlayout.setLayout(QtWidgets.QVBoxLayout())
+        rightlayout.setFixedSize(384, 128)
+        
         self.filename = QtWidgets.QLineEdit(args.filename)
-        self.statusBar.addPermanentWidget(self.filename)
+        rightlayout.layout().addWidget(self.filename)
+
+        
 
         self.capture_button =  QtWidgets.QPushButton("Start Capture")
-        self.statusBar.addPermanentWidget(self.capture_button)
+        rightlayout.layout().addWidget(self.capture_button)
 
-        self.update_button =  QtWidgets.QPushButton("fast_update")
-        self.statusBar.addPermanentWidget(self.update_button)
+        self.update_button =  QtWidgets.QPushButton("slow_update")
+        rightlayout.layout().addWidget(self.update_button)
+        self.txt1 = QtWidgets.QLabel(self.win)
+        rightlayout.layout().addWidget(self.txt1)
+        self.txt1.setText("status_text 1")
+
+
+        self.statusBar.addPermanentWidget(rightlayout)
 
         self.win.setStatusBar(self.statusBar)
         
@@ -189,11 +215,11 @@ class UI:
         print("button")
 
         if (self.update_state == 1):
-            self.update_button.setText("slow_update")
+            self.update_button.setText("fast_update")
             self.update_state = 0
           
         else:
-            self.update_button.setText("fast_update")
+            self.update_button.setText("slow_update")
             self.update_state = 1
 
 
@@ -214,6 +240,21 @@ class UI:
             self.capture_button.setText("Start Capture")
             self.capture_file.close()
 
+    
+
+    def clip(self, pos):
+        if (pos.x() < self.EDGE):
+            pos.setX(self.EDGE)
+        if (pos.y() < self.EDGE):
+            pos.setY(self.EDGE)
+
+        if (pos.x() > (511-self.EDGE)):
+            pos.setX(511-self.EDGE)
+        if (pos.y() > (511-self.EDGE)):
+            pos.setY(511-self.EDGE)
+
+        
+        return pos
 
 
     def mainloop(self, args, camera):
@@ -236,6 +277,21 @@ class UI:
 
             if (need_update):
                 self.imv.setImage(self.array, autoRange=False, autoLevels=False, autoHistogramRange=False)
+                pos = self.clip(self.pos)
+                
+               
+                sub = self.array[int(pos.x())-self.EDGE:int(pos.x())+self.EDGE, int(pos.y())-self.EDGE:int(pos.y())+self.EDGE].copy()
+                min = np.min(sub)
+                max = np.max(sub)
+                fwhm = fit_gauss_circular(sub)
+
+
+                self.txt1.setText("FWHM= " + "{:.2f}  ".format(fwhm) + "min=" + str(min) + " max=" + str(max) + " frame=" + str(self.cnt))
+                sub =  sub * int(65535/max)
+                sub = sub.astype(np.uint16)
+                sub = cv2.resize(sub, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
+                pixmap = self.convert_nparray_to_QPixmap(sub)
+                self.zoom_view.setPixmap(pixmap)
             #if (cnt % 10 == 0):
             #    imv.ui.histogram.setImageItem(pg.ImageItem(array))
             self.cnt = self.cnt + 1
