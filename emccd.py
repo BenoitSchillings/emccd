@@ -11,16 +11,19 @@ from PyQt5 import QtWidgets
 from PyQt5.QtGui  import *
 from PyQt5.QtCore import *
 import os
-#import skyx
+
 from util import *
 import datetime
 import random
 from ser import SerWriter
-
+import skyx
+import collections
 
 from pyvcam import pvc
 from pyvcam.camera import Camera
 from pyvcam import constants as const
+
+sky = skyx.sky6RASCOMTele()
 
 
 #--------------------------------------------------------
@@ -172,7 +175,18 @@ class UI:
         self.zoom_view = QtWidgets.QLabel(self.win)
         
         temp_widget.layout().addWidget(self.zoom_view)
-        
+
+        self.plt = pg.plot(title='Dynamic Plotting with PyQtGraph')
+        self.plt_bufsize = 200
+        self.x = np.linspace(-self.plt_bufsize, 0.0, self.plt_bufsize)
+        self.y = np.zeros(self.plt_bufsize, dtype=np.float64)
+        self.databuffer = collections.deque([0.0]*self.plt_bufsize, self.plt_bufsize)
+
+        temp_widget.layout().addWidget(self.plt)
+        self.plt.showGrid(x=True, y=True)
+        self.plt.setLabel('left', 'fwhm', 'pixels')
+        self.plt.setLabel('bottom', 'frame', 'f')
+        self.curve = self.plt.plot(self.x, self.y, pen=(255,0,0))
         self.statusBar.addPermanentWidget(temp_widget, 1)
 
 
@@ -193,6 +207,11 @@ class UI:
         self.txt1 = QtWidgets.QLabel(self.win)
         rightlayout.layout().addWidget(self.txt1)
         self.txt1.setText("status_text 1")
+
+
+        self.txt2 = QtWidgets.QLabel(self.win)
+        rightlayout.layout().addWidget(self.txt2)
+        self.txt1.setText("status_text 2")
 
 
         self.statusBar.addPermanentWidget(rightlayout)
@@ -240,7 +259,12 @@ class UI:
             self.capture_button.setText("Start Capture")
             self.capture_file.close()
 
-    
+    def updateplot(self, fwhm):
+        self.databuffer.append(fwhm)
+        self.y[:] = self.databuffer
+        self.curve.setData(self.x, self.y)
+        #self.app.processEvents()
+
 
     def clip(self, pos):
         if (pos.x() < self.EDGE):
@@ -255,6 +279,35 @@ class UI:
 
         
         return pos
+
+    def update(self):
+        self.imv.setImage(self.array, autoRange=False, autoLevels=False, autoHistogramRange=False)
+        pos = self.clip(self.pos)
+
+
+        sub = self.array[int(pos.x())-self.EDGE:int(pos.x())+self.EDGE, int(pos.y())-self.EDGE:int(pos.y())+self.EDGE].copy()
+        sub = np.rot90(sub, 1)
+        sub = np.flip(sub, axis=0)
+        min = np.min(sub)
+        max = np.max(sub)
+        fwhm = fit_gauss_circular(sub)
+
+
+        self.txt1.setText("FWHM= " + "{:.2f}  ".format(fwhm) + "min=" + str(min) + " max=" + str(max) + " frame=" + str(self.cnt))
+        self.updateplot(fwhm)
+
+        if (self.cnt % 30 == 0):
+            if not (sky is None):
+                p0 = sky.GetRaDec()
+                
+                self.txt2.setText("RA = " + p0[0][0:8] + " DEC=" + p0[1][0:8])
+
+        sub =  sub * int(65535/max)
+        sub = sub.astype(np.uint16)
+        sub = cv2.resize(sub, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
+        pixmap = self.convert_nparray_to_QPixmap(sub)
+        self.zoom_view.setPixmap(pixmap)
+
 
 
     def mainloop(self, args, camera):
@@ -276,25 +329,8 @@ class UI:
                 need_update = True
 
             if (need_update):
-                self.imv.setImage(self.array, autoRange=False, autoLevels=False, autoHistogramRange=False)
-                pos = self.clip(self.pos)
-                
-               
-                sub = self.array[int(pos.x())-self.EDGE:int(pos.x())+self.EDGE, int(pos.y())-self.EDGE:int(pos.y())+self.EDGE].copy()
-                sub = np.rot90(sub, 1)
-                sub = np.flip(sub, axis=0)
-                min = np.min(sub)
-                max = np.max(sub)
-                fwhm = fit_gauss_circular(sub)
-
-
-                self.txt1.setText("FWHM= " + "{:.2f}  ".format(fwhm) + "min=" + str(min) + " max=" + str(max) + " frame=" + str(self.cnt))
-                sub =  sub * int(65535/max)
-                sub = sub.astype(np.uint16)
-                sub = cv2.resize(sub, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-                pixmap = self.convert_nparray_to_QPixmap(sub)
-                self.zoom_view.setPixmap(pixmap)
-            #if (cnt % 10 == 0):
+                self.update()
+             #if (cnt % 10 == 0):
             #    imv.ui.histogram.setImageItem(pg.ImageItem(array))
             self.cnt = self.cnt + 1
 
@@ -312,6 +348,16 @@ if __name__ == "__main__":
     parser.add_argument("-guide", "--guide", type=int, default = 0, help="frame per guide cycle (0 to disable)")
     parser.add_argument("-count", "--count", type=int, default = 100, help="number of frames to capture")
     args = parser.parse_args()
+
+    try:
+        sky.Connect()
+    except:
+        sky = None
+
+
+
+
+   
 
     ui = UI(args)
     camera = fake_emccd(-30)
