@@ -35,7 +35,7 @@ class fake_emccd:
         
         print("init cam")
         self.frame = np.random.randint(0,4096, (512,512), dtype=np.uint16)
-        self.stars_frame = self.stars(self.frame, 40, gain=2)
+        self.stars_frame = self.stars(self.frame, 80, gain=2)
 
     def stars(self, image, number, max_counts=10000, gain=1):
         """
@@ -281,6 +281,8 @@ class UI:
                 
                
                 sub = self.array[int(pos.x())-self.EDGE:int(pos.x())+self.EDGE, int(pos.y())-self.EDGE:int(pos.y())+self.EDGE].copy()
+                sub = np.rot90(sub, 1)
+                sub = np.flip(sub, axis=0)
                 min = np.min(sub)
                 max = np.max(sub)
                 fwhm = fit_gauss_circular(sub)
