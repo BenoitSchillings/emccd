@@ -12,6 +12,8 @@ class Mover(QtWidgets.QWidget):
     def initUI(self):
 
         self.setMinimumSize(1, 30)
+        self.px = 0
+        self.py = 0
 
 
 
@@ -24,9 +26,10 @@ class Mover(QtWidgets.QWidget):
         qp.end()
 
     def drawWidget(self, qp):
-
-
-        font = QtGui.QFont('Serif', 7, QtGui.QFont.Light)
+        qp.translate(100,100)
+        qp.rotate(0)
+        
+        font = QtGui.QFont('Serif', 11, QtGui.QFont.Light)
         qp.setFont(font)
 
         size = self.size()
@@ -37,10 +40,42 @@ class Mover(QtWidgets.QWidget):
         pen = QtGui.QPen()
         pen.setWidth(1)
         qp.setPen(pen)
-        qp.setPen(QColor(255, 0, 0))
+        qp.setPen(QColor(255, 40, 40))
 
-        for d in range(10, 100, 20):
-            qp.drawEllipse(100 - d,100 -d, d*2, d*2)
+        for d in range(10, 80, 20):
+            qp.drawEllipse(- d, -d, d*2, d*2)
 
 
- 
+        qp.setPen(QColor(0, 0, 0))
+        qp.setBrush(Qt.SolidPattern)
+        qp.drawEllipse(self.px - 5, self.py -5, 10,10)
+
+
+
+        qp.setPen(QPen(Qt.black,1, Qt.SolidLine))
+        qp.drawLine(-80,0,80,0)
+        qp.drawLine(0,-80,0,80)
+
+        qp.drawText(-95, 5, "E")
+        qp.drawText(85, 5, "W")
+
+        qp.drawText(-5, 13-100, "N")
+        qp.drawText(-3, 97, "S")
+
+
+    def mousePressEvent(self, event):
+        self.px = event.pos().x() - 100
+        self.py = event.pos().y() - 100
+        self.update()
+
+
+    def mouseMoveEvent(self, event):
+        self.px = event.pos().x() - 100
+        self.py = event.pos().y() - 100
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.px = 0
+        self.py = 0
+        self.update()
+
