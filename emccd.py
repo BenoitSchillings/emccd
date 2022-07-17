@@ -23,6 +23,8 @@ from pyvcam import pvc
 from pyvcam.camera import Camera
 from pyvcam import constants as const
 
+import mover
+
 sky = skyx.sky6RASCOMTele()
 
 
@@ -158,7 +160,7 @@ class UI:
         self.win = FrameWindow()
         self.EDGE = 16
         
-        self.win.resize(800,800)
+        self.win.resize(1200,900)
         
         self.imv = pg.ImageView()
         self.imv.setImage(self.array)
@@ -171,11 +173,14 @@ class UI:
 
         temp_widget = QtWidgets.QWidget(self.win)
         temp_widget.setLayout(QtWidgets.QHBoxLayout())
-        temp_widget.setFixedSize(768, 256)
+        temp_widget.setFixedSize(1024, 256)
         self.zoom_view = QtWidgets.QLabel(self.win)
         
         temp_widget.layout().addWidget(self.zoom_view)
+        _bar = mover.Mover()
+        _bar.setFixedSize(200,200)
 
+        temp_widget.layout().addWidget(_bar)
         self.plt = pg.plot(title='Dynamic Plotting with PyQtGraph')
         self.plt_bufsize = 200
         self.x = np.linspace(-self.plt_bufsize, 0.0, self.plt_bufsize)
@@ -187,6 +192,7 @@ class UI:
         self.plt.setLabel('left', 'fwhm', 'pixels')
         self.plt.setLabel('bottom', 'frame', 'f')
         self.curve = self.plt.plot(self.x, self.y, pen=(255,0,0))
+        
         self.statusBar.addPermanentWidget(temp_widget, 1)
 
 
