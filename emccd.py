@@ -84,6 +84,7 @@ class fake_emccd:
         self.running = 0
 
 
+
 class emccd:
     def __init__(self, temp):
         
@@ -93,23 +94,25 @@ class emccd:
         
         self.vcam = next(Camera.detect_camera())
         self.vcam.open()
-        self.vcam.gain=2
+        self.vcam.gain=1
         print(self.vcam.temp)
         self.vcam.temp_setpoint = temp * 100 
         print(self.vcam.temp_setpoint)
         self.vcam.clear_mode="Pre-Sequence"
         #self.vcam.clear_mode="Pre-Exposure"
-
-        pvc.set_param(self.vcam.handle, const.PARAM_READOUT_PORT, 0)
-        #v = pvc.get_param(self.vcam.handle, const.PARAM_FAN_SPEED_SETPOINT, const.ATTR_CURRENT) 
-        pvc.set_param(self.vcam.handle, const.PARAM_GAIN_MULT_FACTOR, 0)
+        self.vcam.gain = 3
+        self.vcam.readout_port = 0
+        self.vcam.set_param(const.PARAM_GAIN_MULT_FACTOR, 1000)
         
         #while(1):
             #print(self.vcam.temp)
         
 
     def get_frame(self):        
-        frame = self.vcam.get_live_frame().reshape(self.vcam.sensor_size[::-1]) 
+        frame, fps, frame_count = self.vcam.poll_frame()
+        #print(fps, frame_count, frame)
+        #print(self.vcam.sensor_size)
+        frame = frame['pixel_data'].reshape(self.vcam.sensor_size[::-1]) 
         return frame
         
     def start(self, exposure):
@@ -154,6 +157,7 @@ class UI:
     def __init__(self,  args):
         self.capture_state = 0
         self.update_state = 1
+        self.rms = 0
         self.pos = QPoint(256,256)
         self.array = np.random.randint(0,8192, (512,512), dtype=np.uint16)
         
@@ -177,10 +181,10 @@ class UI:
         self.zoom_view = QtWidgets.QLabel(self.win)
         
         temp_widget.layout().addWidget(self.zoom_view)
-        _bar = mover.Mover()
-        _bar.setFixedSize(200,200)
+        self.mover = mover.Mover()
+        self.mover.setFixedSize(200,200)
 
-        temp_widget.layout().addWidget(_bar)
+        temp_widget.layout().addWidget(self.mover)
         self.plt = pg.plot(title='Dynamic Plotting with PyQtGraph')
         self.plt_bufsize = 200
         self.x = np.linspace(-self.plt_bufsize, 0.0, self.plt_bufsize)
@@ -248,9 +252,7 @@ class UI:
             self.update_state = 1
 
 
-    def Capture_buttonClick(self):
-        print("button")
-
+    def toggle_capture(self):
         if (self.capture_state == 0):
             
             self.capture_button.setText("Stop Capture")
@@ -264,6 +266,10 @@ class UI:
             self.capture_state = 0
             self.capture_button.setText("Start Capture")
             self.capture_file.close()
+
+    def Capture_buttonClick(self):
+        self.toggle_capture()
+
 
     def updateplot(self, fwhm):
         self.databuffer.append(fwhm)
@@ -298,8 +304,9 @@ class UI:
         max = np.max(sub)
         fwhm = fit_gauss_circular(sub)
 
+        self.rms = np.std(self.array)
 
-        self.txt1.setText("FWHM= " + "{:.2f}  ".format(fwhm) + "min=" + str(min) + " max=" + str(max) + " frame=" + str(self.cnt))
+        self.txt1.setText("FWHM= " + "{:.2f}  ".format(fwhm) + "min=" + str(min) + " max=" + str(max) + " frame=" + str(self.cnt) + " RMS=" + "{:.1f} ".format(self.rms))
         self.updateplot(fwhm)
 
         if (self.cnt % 30 == 0):
@@ -320,19 +327,27 @@ class UI:
 
  
         while(self.win.quit == 0):
-            time.sleep(0.03)
+            time.sleep(0.008)
+            if (self.mover.moving()):
+                rx, ry = self.mover.rate()
+                print("move at " + str(rx) + " " + str(ry))
             
             self.statusBar.showMessage(str(self.cnt), 2000)
             app.processEvents()
             self.array = camera.get_frame()
             if (self.capture_state == 1):
                 self.capture_file.add_image(self.array)
+                if (self.cnt > 3000):
+                    self.toggle_capture()
+                    self.toggle_capture()
 
             need_update = False
             if (self.update_state == 1):
                 need_update = True
             if (self.update_state == 0 and self.cnt % 30 == 0):
                 need_update = True
+            #if (self.cnt % 30 == 15):
+                #print(camera.vcam.temp)
 
             if (need_update):
                 self.update()
@@ -360,13 +375,16 @@ if __name__ == "__main__":
     except:
         sky = None
 
-
+    #if not (sky is None):
+        #sky.bump(120,0)
 
 
    
 
     ui = UI(args)
-    camera = fake_emccd(-30)
+    camera = emccd(-80)
+    camera.start(0.03)
+
     ui.mainloop(args, camera)
 
 

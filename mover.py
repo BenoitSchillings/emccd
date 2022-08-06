@@ -14,6 +14,7 @@ class Mover(QtWidgets.QWidget):
         self.setMinimumSize(1, 30)
         self.px = 0
         self.py = 0
+        self.last_move = False
 
 
 
@@ -67,6 +68,7 @@ class Mover(QtWidgets.QWidget):
         self.px = event.pos().x() - 100
         self.py = event.pos().y() - 100
         self.update()
+        self.last_move = False
 
 
     def mouseMoveEvent(self, event):
@@ -77,5 +79,16 @@ class Mover(QtWidgets.QWidget):
     def mouseReleaseEvent(self, event):
         self.px = 0
         self.py = 0
+        self.last_move = True
         self.update()
+
+
+    def moving(self):
+        if (self.last_move):
+            self.last_move = False
+            return True
+        return(self.px != 0 or self.py != 0)
+
+    def rate(self):
+        return self.px/10.0, self.py/10.0
 

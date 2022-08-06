@@ -19,7 +19,7 @@ class SerWriter(object):
         self.xsize = xsize
         self.ysize = ysize
         self.depth = depth
-        self.image_size = self.xsize * self.ysize
+        self.image_size = (self.xsize * self.ysize)
         self.count = 0
         self.write_header()
 
@@ -64,6 +64,7 @@ class Ser(object):
         self.image_size = self.xsize * self.ysize
 
     def read_at(self, pos, size, ntype):
+        print(pos)
         self._fid.seek(pos)
         return np.fromfile(self._fid, ntype, size)
         
@@ -80,9 +81,9 @@ class Ser(object):
             return 0
             
         if (self.depth == 2):
-            img = self.read_at(178 + image_number * self.image_size * self.depth, self.image_size, np.uint16)
+            img = self.read_at((178) + image_number * self.image_size * self.depth, self.image_size, np.uint16)
         else:
-            img = self.read_at(178 + image_number * self.image_size, self.image_size, np.uint8)  
+            img = self.read_at((178) + image_number * self.image_size, self.image_size, np.uint8)  
             img = img.astype(np.uint16)
             img = img * 255 
             
