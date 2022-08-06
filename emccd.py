@@ -100,9 +100,9 @@ class emccd:
         print(self.vcam.temp_setpoint)
         self.vcam.clear_mode="Pre-Sequence"
         #self.vcam.clear_mode="Pre-Exposure"
-        self.vcam.gain = 3
+        self.vcam.gain = 1
         self.vcam.readout_port = 0
-        self.vcam.set_param(const.PARAM_GAIN_MULT_FACTOR, 1000)
+        self.vcam.set_param(const.PARAM_GAIN_MULT_FACTOR, 0*1000)
         
         #while(1):
             #print(self.vcam.temp)
@@ -159,12 +159,12 @@ class UI:
         self.update_state = 1
         self.rms = 0
         self.pos = QPoint(256,256)
-        self.array = np.random.randint(0,8192, (512,512), dtype=np.uint16)
+        self.array = np.random.randint(0,28192, (512,512), dtype=np.uint16)
         
         self.win = FrameWindow()
         self.EDGE = 16
         
-        self.win.resize(1200,900)
+        self.win.resize(1300,1100)
         
         self.imv = pg.ImageView()
         self.imv.setImage(self.array)
@@ -202,7 +202,7 @@ class UI:
 
         rightlayout = QtWidgets.QWidget(self.win)
         rightlayout.setLayout(QtWidgets.QVBoxLayout())
-        rightlayout.setFixedSize(384, 128)
+        rightlayout.setFixedSize(564, 228)
         
         self.filename = QtWidgets.QLineEdit(args.filename)
         rightlayout.layout().addWidget(self.filename)
